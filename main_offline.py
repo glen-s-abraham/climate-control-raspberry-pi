@@ -146,6 +146,13 @@ def initialize_csv():
             csv_writer = csv.writer(file)
             csv_writer.writerow(CSV_HEADER)
 
+def initialize_relays():
+    """
+    Initialize the relays to the OFF state both logically and physically.
+    """
+    for relay in RELAY_PINS:
+        relay_controller.set_relay_state(relay, 'OFF')
+
 def main():
     """
     Main function that runs the sensor monitoring loop.
@@ -153,6 +160,7 @@ def main():
     initialize_csv()
 
     relay_status = {relay: 'OFF' for relay in RELAY_PINS}  # Assume relays start in the OFF state
+    initialize_relays()
     last_sensor_reading_time = time.time() - SLEEP_DURATION_SENSOR
 
     while True:
