@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Constants
 SLEEP_DURATION = 300
-MONGO_URL = "mongodb+srv://glen:CdrIiPbqNZRZqV5Z@cluster0.u2viabu.mongodb.net/"
+MONGO_URL = ""
 
 # It's assumed that you have environment variables for MongoDB credentials
 MONGO_USER = None #os.environ.get("MONGO_USER")
