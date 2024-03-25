@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime,timedelta
 import time
 import logging
 from logging.handlers import RotatingFileHandler
@@ -15,6 +15,7 @@ HUMIDITY_THRESHOLD_LOW = 81  # Humidity lower-bound threshold
 HUMIDITY_THRESHOLD_HIGH = 87  # Humidity upper-bound threshold
 TEMPERATURE_THRESHOLD_LOW = 28  # Temperature lower-bound threshold
 TEMPERATURE_THRESHOLD_HIGH = 30  # Temperature upper-bound threshold
+NOTIFY_INTERVAL = timedelta(minutes=30)  # Notification interval for low humidity alerts
 HUMIDITY_ALERT_THRESHOLD = 75  # Extra humidity level threshold for sending notifications
 RELAY_PINS = {
     'relay1': 17,
@@ -60,10 +61,10 @@ def send_relay_status_email(relay_name, status, humidity):
     send_email(subject, message, MAILING_LIST)
     logger.info(f"{relay_name} state changed to {status}.")
 
-def notify_low_humidity_if_relay_on(humidity, relay_status):
+def notify_low_humidity_if_relay_on(humidity, relay_status, last_notification_time):
     """
-    Notify via email if the humidity drops below the alert threshold
-    and the humidifier relay is turned on.
+    Notify via email if the humidity drops below the alert threshold and the humidifier relay is turned on.
+    Only send a notification if NOTIFY_INTERVAL time has passed since the last notification.
     
     Parameters
     ----------
@@ -71,12 +72,23 @@ def notify_low_humidity_if_relay_on(humidity, relay_status):
         Current humidity level.
     relay_status : dict
         Dictionary containing the status of the relays.
+    last_notification_time : datetime
+        The time when the last notification was sent.
+        
+    Returns
+    -------
+    datetime
+        The updated last_notification_time.
     """
+    current_time = datetime.now()
     if humidity < HUMIDITY_ALERT_THRESHOLD and relay_status['relay1'] == 'ON':
-        subject = "Low Humidity Alert"
-        message = f"Humidity level dropped below {HUMIDITY_ALERT_THRESHOLD}% with the humidifier ON."
-        send_email(subject, message, MAILING_LIST)
-        logger.info("Email sent due to low humidity level with humidifier ON.")
+        if current_time - last_notification_time >= NOTIFY_INTERVAL:
+            subject = "Low Humidity Alert"
+            message = f"Humidity level dropped below {HUMIDITY_ALERT_THRESHOLD}% with the humidifier ON."
+            send_email(subject, message, MAILING_LIST)
+            logger.info("Email sent due to low humidity level with humidifier ON.")
+            last_notification_time = current_time
+    return last_notification_time
 
 def write_to_csv(timestamp, temperature_f, temperature_c, humidity, relay_status):
     """
@@ -155,13 +167,13 @@ def initialize_relays():
 
 def main():
     """
-    Main function that runs the sensor monitoring loop.
+    Main function that runs the sensor monitoring loop. Only sends low humidity notifications every 30 minutes.
     """
     initialize_csv()
+    initialize_relays()
 
     relay_status = {relay: 'OFF' for relay in RELAY_PINS}  # Assume relays start in the OFF state
-    initialize_relays()
-    last_sensor_reading_time = time.time() - SLEEP_DURATION_SENSOR
+    last_notification_time = datetime.min  # Initialize last_notification_time to an early date
 
     while True:
         try:
@@ -173,7 +185,10 @@ def main():
 
                 logger.info(f"Sensor data: Temp: {temperature_f:.1f} F / {temperature_c:.1f} C, Humidity: {humidity}%")
                 check_conditions_and_toggle_relays(temperature_c, humidity, relay_status)
-                notify_low_humidity_if_relay_on(humidity, relay_status)  # Check for low humidity and notify if necessary
+                
+                # Check for low humidity and notify if necessary, updating the last_notification_time
+                last_notification_time = notify_low_humidity_if_relay_on(humidity, relay_status, last_notification_time)
+                
                 write_to_csv(timestamp, temperature_f, temperature_c, humidity, relay_status)
 
         except Exception as e:
