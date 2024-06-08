@@ -21,7 +21,6 @@ RELAY_PINS = {
     'relay1': 17,
     'relay2': 18
 }
-MAILING_LIST = ["glenabraham27@gmail.com", "liyasunny2005@gmail.com"]
 CSV_HEADER = ['Timestamp', 'Temperature_F', 'Temperature_C', 'Humidity', 'Relay1', 'Relay2']
 
 # MQTT Constants
@@ -32,6 +31,9 @@ MQTT_PASSWORD = "password"
 MQTT_SENSOR_TOPIC = "sensor/data"
 MQTT_RELAY_TOPIC = "relay/status"
 MQTT_ERROR_TOPIC = "sensor/error"
+
+FAN_SLEEP_MINUTES=60
+FAN_RUN_MINUTES=15
 
 # Configure logging
 home_directory = os.path.expanduser('~')
@@ -130,20 +132,25 @@ def manage_relay2_timing(last_toggle_time, relay_status):
     """Manage relay2 to turn on for a specified duration within an interval."""
     try:
         current_time = datetime.now()
-        interval_duration = timedelta(hours=1)
-        on_duration = timedelta(minutes=15)
+        interval_duration = timedelta(minutes=FAN_SLEEP_MINUTES)  # Interval duration (1 hour)
+        on_duration = timedelta(minutes=FAN_RUN_MINUTES)       # ON duration (15 minutes)
 
-        if relay_status['relay2'] == 'ON' and current_time - last_toggle_time >= on_duration:
-            relay_controller.set_relay_state('relay2', 'OFF')
-            relay_status['relay2'] = 'OFF'
-            logger.info("Relay relay2 state changed to OFF due to time interval.")
-            publish_relay_status(relay_status)
-        elif relay_status['relay2'] == 'OFF' and current_time - last_toggle_time >= interval_duration:
-            relay_controller.set_relay_state('relay2', 'ON')
-            relay_status['relay2'] = 'ON'
-            logger.info("Relay relay2 state changed to ON due to time interval.")
-            publish_relay_status(relay_status)
-            last_toggle_time = current_time
+        if relay_status['relay2'] == 'ON':
+            # Turn off if the ON duration has passed
+            if current_time - last_toggle_time >= on_duration:
+                relay_controller.set_relay_state('relay2', 'OFF')
+                relay_status['relay2'] = 'OFF'
+                logger.info("Relay relay2 state changed to OFF due to time interval.")
+                publish_relay_status(relay_status)
+                last_toggle_time = current_time  # Reset the toggle time when it turns off
+        else:
+            # Turn on if the OFF duration (interval - on_duration) has passed
+            if current_time - last_toggle_time >= interval_duration - on_duration:
+                relay_controller.set_relay_state('relay2', 'ON')
+                relay_status['relay2'] = 'ON'
+                logger.info("Relay relay2 state changed to ON due to time interval.")
+                publish_relay_status(relay_status)
+                last_toggle_time = current_time  # Reset the toggle time when it turns on
     except Exception as e:
         logger.error(f"An error occurred while managing relay2 timing: {e}")
         publish_error_message(str(e))
