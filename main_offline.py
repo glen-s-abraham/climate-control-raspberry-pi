@@ -32,8 +32,8 @@ MQTT_SENSOR_TOPIC = "sensor/data"
 MQTT_RELAY_TOPIC = "relay/status"
 MQTT_ERROR_TOPIC = "sensor/error"
 
-FAN_SLEEP_MINUTES=60
-FAN_RUN_MINUTES=15
+FAN_SLEEP_MINUTES=5
+FAN_RUN_MINUTES=2
 
 # Configure logging
 home_directory = os.path.expanduser('~')
